@@ -1,0 +1,12 @@
+# General settings
+general:
+  width: 3440
+  height: 1440
+  fps: 60 # used for calculation of capture tick (1000ms/fps)
+
+# CPU-encoder specific settings
+x264:
+  preset: veryfast
+  profile: high
+  rf_constant: 18.0 #  0-51 (< == better)
+  threads: 0 # X264_THREADS_AUTO == 0, X264_SYNC_LOOKAHEAD_AUTO == -1

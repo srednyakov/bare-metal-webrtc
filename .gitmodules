@@ -1,0 +1,9 @@
+[submodule "win-capture-native/third-party/vcpkg"]
+	path = win-capture-native/third-party/vcpkg
+	url = https://github.com/microsoft/vcpkg.git
+[submodule "win-capture-native/third-party/SPSCQueue"]
+	path = win-capture-native/third-party/SPSCQueue
+	url = https://github.com/rigtorp/SPSCQueue.git
+[submodule "win-capture-native/third-party/tracy"]
+	path = win-capture-native/third-party/tracy
+	url = https://github.com/wolfpld/tracy.git
