@@ -1,0 +1,26 @@
+{
+    "version": 3,
+    "configurePresets": [
+      {
+        "name": "clang64-release",
+        "displayName": "CLANG64 Release",
+        "generator": "Ninja",
+        "binaryDir": "${sourceDir}/build",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Release",
+          "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/third-party/vcpkg/scripts/buildsystems/vcpkg.cmake",
+          "VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+          "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/clang.cmake"
+        }
+      },
+      {
+        "name": "clang64-debug",
+        "inherits": "clang64-release",
+        "displayName": "CLANG64 Debug",
+        "cacheVariables": {
+          "CMAKE_BUILD_TYPE": "Debug",
+          "ENABLE_PROFILING": "ON"
+        }
+      }
+    ]
+}

@@ -1,0 +1,5 @@
+{
+    "name": "win-capture-native",
+    "version": "0.1.0",
+    "dependencies": ["yaml-cpp", "x264"]
+}

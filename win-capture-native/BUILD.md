@@ -1,87 +1,75 @@
-# Build win-capture-native (Windows target only)
+# Build win-capture-native (Windows)
 
 ## Requirements
 
-- Visual Studio 2022+ (with C++ workload)
-- DirectX SDK & Runtime
-- CMake 3.20+
-- vcpkg
+- MSYS2 with CLANG64 environment
 
-## Install vcpkg and dependencies
+## Install Dependencies
 
-```bash
-cd win-capture-native
+1. **Install MSYS2:** https://www.msys2.org/
 
-# clone vcpkg
-git submodule update --init --recursive
-cd third-party\vcpkg
-
-# bootstrap vcpkg
-.\bootstrap-vcpkg.bat
-
-# install dependencies
-.\vcpkg install x264:x64-windows yaml-cpp:x64-windows
-
-# (optional) integration with system
-.\vcpkg integrate install
-```
-
-## Build via CMake
-
-```bash
-cd win-capture-native
-
-# CMake config
-cmake -B build/ -DCMAKE_TOOLCHAIN_FILE="third-party/vcpkg/scripts/buildsystems/vcpkg.cmake"
-
-# CMake build
-cmake --build build/ -j --config Release
-
-# Results:
-#   build/bin/Release/win-capture-native.dll
-#   ...
-```
-
-## Build with Tracy Profiling
-
-To enable performance profiling with [Tracy](https://github.com/wolfpld/tracy):
-
-```bash
-cd win-capture-native
-
-# CMake config with profiling enabled
-cmake -B build/ -DENABLE_PROFILING=ON -DCMAKE_TOOLCHAIN_FILE="third-party/vcpkg/scripts/buildsystems/vcpkg.cmake"
-
-# CMake build
-cmake --build build/ -j --config Release
-```
-
-### Run Smoke Test
-
-The smoke test captures 60 seconds of screen and profiles performance:
-
-```bash
-# Run smoke test (with Tracy profiling)
-cd build/bin/Release/
-./win-capture-native-smoke-test.exe
-
-# Output: smoke_output.h264 (encoded video)
-```
-
-### Run with Tracy Profiler
-
-1. **Run the smoke test:**
-   ```bash
-   cd build/bin/Release/
-   ./win-capture-native-smoke-test.exe
+2. **Install CLANG64 toolchain and dependencies:**
+   ```powershell
+   C:\msys64\msys2_shell.cmd -defterm -here -no-start -clang64 -c "pacman -Syu --noconfirm"
+   C:\msys64\msys2_shell.cmd -defterm -here -no-start -clang64 -c "pacman -S --noconfirm mingw-w64-clang-x86_64-toolchain mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja"
    ```
 
-2. **Connect Tracy Profiler:**
-   - Download [Tracy v0.13.1](https://github.com/wolfpld/tracy/releases/tag/v0.13.1)
-   - Run `tracy-profiler.exe` (profiler GUI)
-   - Click "Connect" → select `127.0.0.1` → see real-time timeline
+3. **Install vcpkg via `git submodule update --init --recursive`**
 
-3. **Or use Tracy Capture (CLI):**
-   ```bash
-   tracy-capture.exe -o smoke-test.tracy
-   ```
+## Build Using CMake Presets
+
+### MSYS2 CLANG64
+```bash
+cd win-capture-native
+
+# Release build
+cmake --preset clang64-release
+cmake --build build/ -j
+
+# Debug build (with Tracy profiling)
+cmake --preset clang64-debug
+cmake --build build/ -j
+```
+
+### PowerShell (requires installation of CMake & Ninja on Windows)
+```powershell
+$env:PATH = "C:\msys64\clang64\bin;$env:PATH"
+cd win-capture-native
+
+# Release build
+cmake --preset clang64-release
+cmake --build build/ -j
+
+# Debug build (with Tracy profiling)
+cmake --preset clang64-debug
+cmake --build build/ -j
+```
+
+## Build Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `ENABLE_PROFILING` | OFF | Enable Tracy profiling |
+
+## Run with Tracy Profiling
+Connect [tracy-profiler.exe](https://github.com/wolfpld/tracy/releases/tag/v0.13.1) to `127.0.0.1` to view performance timeline.
+
+## Output Structure
+
+```
+build/
+├── bin/
+│   ├── Debug/
+│   │   ├── libwin-capture-native.dll
+│   │   ├── win-capture-native-smoke-test.exe
+│   │   └── smoke_config.yaml
+│   └── Release/
+│       ├── libwin-capture-native.dll
+│       ├── win-capture-native-smoke-test.exe
+│       └── smoke_config.yaml
+└── lib/
+    ├── Debug/
+    │   └── libwin-capture-native.dll.a
+    └── Release/
+        └── libwin-capture-native.dll.a
+```

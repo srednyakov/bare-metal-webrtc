@@ -30,11 +30,13 @@ auto main() -> int {
     auto error = capture_native_create_capturer_x264("smoke_config.yaml", &capturer);
     if (error != CaptureError::CAPTURE_ERROR_OK) {
         std::println("failed capture_native_create_capturer_x264: {}", error);
+        return 1;
     }
 
     error = capture_native_start_capturer(capturer);
     if (error != CaptureError::CAPTURE_ERROR_OK) {
         std::println("failed capture_native_start_capturer: {}", error);
+        return 1;
     }
 
     auto file = static_cast<FILE*>(nullptr);

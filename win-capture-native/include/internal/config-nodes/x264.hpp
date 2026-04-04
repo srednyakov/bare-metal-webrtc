@@ -2,6 +2,11 @@
 
 #include <string>
 #include <cstdint>
+
+#ifndef YAML_CPP_STATIC_DEFINE
+#define YAML_CPP_STATIC_DEFINE
+#endif // YAML_CPP_STATIC_DEFINE
+
 #include <yaml-cpp/yaml.h>
 
 namespace cn::config {
