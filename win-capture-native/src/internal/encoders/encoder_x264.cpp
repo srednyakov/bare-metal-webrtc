@@ -19,7 +19,7 @@ auto EncoderX264::InitializeX264() -> CaptureError {
     Stop(); // clear before config
 
     if (x264_param_default_preset(&_x264_param, _config.x264.preset.c_str(), "zerolatency") != 0) {
-        return CaptureError::CAPTURE_ERROR_INVALID_X264_PRESET;
+        return CaptureError::CaptureErrorInvalidX264Preset;
     }
 
 #ifdef _DEBUG
@@ -37,7 +37,7 @@ auto EncoderX264::InitializeX264() -> CaptureError {
     _x264_param.i_threads = _config.x264.threads;
 
     if (x264_param_apply_profile(&_x264_param, _config.x264.profile.c_str()) != 0) {
-        return CaptureError::CAPTURE_ERROR_INVALID_X264_PROFILE;
+        return CaptureError::CaptureErrorInvalidX264Profile;
     }
 
     _x264_param.rc.i_rc_method = X264_RC_CRF; // constant quality
@@ -56,7 +56,7 @@ auto EncoderX264::InitializeX264() -> CaptureError {
 
     _x264_encoder = x264_encoder_open(&_x264_param);
     if (_x264_encoder == nullptr) {
-        return CaptureError::CAPTURE_ERROR_FAILED_X264_ENCODER_OPEN;
+        return CaptureError::CaptureErrorFailedX264EncoderOpen;
     }
 
     x264_picture_init(&_x264_pic_in);
@@ -65,19 +65,19 @@ auto EncoderX264::InitializeX264() -> CaptureError {
     _x264_pic_in.img.i_csp = _x264_param.i_csp;
     _x264_pic_in.img.i_plane = 2; // NV12 has 2 planes
 
-    return CaptureError::CAPTURE_ERROR_OK;
+    return CaptureError::CaptureErrorOK;
 }
 
 auto EncoderX264::Start() noexcept -> CaptureError {
     auto error = InitializeX264();
-    if (error != CaptureError::CAPTURE_ERROR_OK) {
+    if (error != CaptureError::CaptureErrorOK) {
         return error;
     }
 
     _running.store(true, std::memory_order_release);
     _worker = std::thread(&EncoderX264::Worker, this);
 
-    return CaptureError::CAPTURE_ERROR_OK;
+    return CaptureError::CaptureErrorOK;
 }
 
 auto EncoderX264::Stop() noexcept -> void {
@@ -113,7 +113,7 @@ auto EncoderX264::HandleRawCpuFrame(RawCpuFrame const& frame) noexcept -> Captur
         const auto encoded_bytes = x264_encoder_encode(_x264_encoder, &nal, &nal_count, &_x264_pic_in, &_x264_pic_out);
         // encoded_bytes == 0 -> frame not ready / < 0 -> error
         if (encoded_bytes <= 0) {
-            return (encoded_bytes < 0) ? CaptureError::CAPTURE_ERROR_FAILED_X264_ENCODE : CaptureError::CAPTURE_ERROR_OK;
+            return (encoded_bytes < 0) ? CaptureError::CaptureErrorFailedX264Encode : CaptureError::CaptureErrorOK;
         }
     }
 
@@ -136,7 +136,7 @@ auto EncoderX264::HandleRawCpuFrame(RawCpuFrame const& frame) noexcept -> Captur
     }
 
     const auto result = _encoded.try_emplace(std::move(buffer), frame.pts, _x264_pic_out.i_type == X264_TYPE_IDR);
-    return result ? CaptureError::CAPTURE_ERROR_OK : CaptureError::CAPTURE_ERROR_FAILED_ENCODER_BUFFER_EMPLACE;
+    return result ? CaptureError::CaptureErrorOK : CaptureError::CaptureErrorFailedEncoderBufferEmplace;
 }
 
 auto EncoderX264::Worker() noexcept -> void {
@@ -148,7 +148,7 @@ auto EncoderX264::Worker() noexcept -> void {
 
         auto slot = _captured.TryLockLatestSlot(MAX_LOCK_RETRY_COUNT);
         if (slot == nullptr) {
-            _last_error.store(CaptureError::CAPTURE_ERROR_EMPTY_CAPTURED_BUFFER, std::memory_order_relaxed);
+            _last_error.store(CaptureError::CaptureErrorEmptyCapturedBuffer, std::memory_order_relaxed);
             continue;
         }
 
@@ -157,12 +157,12 @@ auto EncoderX264::Worker() noexcept -> void {
         });
 
         if (slot->staging == nullptr) {
-            _last_error.store(CaptureError::CAPTURE_ERROR_INVALID_CAPTURED_TEXTURE, std::memory_order_relaxed);
+            _last_error.store(CaptureError::CaptureErrorInvalidCapturedTexture, std::memory_order_relaxed);
             continue;
         }
 
         if (slot->staging_map.pData == nullptr) {
-            _last_error.store(CaptureError::CAPTURE_ERROR_INVALID_TEXTURE_MAP, std::memory_order_relaxed);
+            _last_error.store(CaptureError::CaptureErrorInvalidTextureMap, std::memory_order_relaxed);
             continue;
         }
 
@@ -177,7 +177,7 @@ auto EncoderX264::Worker() noexcept -> void {
         const auto error = HandleRawCpuFrame(raw_frame);
         _last_error.store(error, std::memory_order_relaxed);
 
-        if (error != CaptureError::CAPTURE_ERROR_OK) {
+        if (error != CaptureError::CaptureErrorOK) {
             continue;
         }
 

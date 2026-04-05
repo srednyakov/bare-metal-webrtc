@@ -14,6 +14,7 @@ option(ENABLE_PROFILING "Enable Tracy profiling" OFF)
 
 set(SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/capture.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/errors.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/internal/capturer.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/internal/capturer_fabric.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/internal/encoders/encoder_x264.cpp
@@ -22,6 +23,7 @@ set(SOURCES
 
 set(HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/capture.h
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/errors.h
     ${CMAKE_CURRENT_SOURCE_DIR}/include/types.h
 )
 

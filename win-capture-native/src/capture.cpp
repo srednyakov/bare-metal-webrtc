@@ -6,12 +6,12 @@
 
 CAPTURE_API int capture_native_create_capturer_x264(const char* config_path, void** out_capturer_handle) {
     auto [capturer, create_error] = cn::CapturerFabric::Instance().CreateCapturer<cn::EncoderX264>(config_path);
-    if (create_error != CaptureError::CAPTURE_ERROR_OK) {
+    if (create_error != CaptureError::CaptureErrorOK) {
         return static_cast<int>(create_error);
     }
 
     *out_capturer_handle = capturer;
-    return static_cast<int>(CaptureError::CAPTURE_ERROR_OK);
+    return static_cast<int>(CaptureError::CaptureErrorOK);
 }
 
 CAPTURE_API void capture_native_delete_capturer(void* capturer_handle) {

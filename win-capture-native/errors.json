@@ -1,0 +1,33 @@
+{
+	"errors": [
+		{"name": "CaptureErrorOK", "description": "Success"},
+		{"name": "CaptureErrorFailedCreateDXGIFactory", "description": "Failed to create DXGI factory"},
+		{"name": "CaptureErrorFailedConfigLoad", "description": "Failed to load YAML config"},
+		{"name": "CaptureErrorFailedEnumAdapters", "description": "Failed to enumerate DXGI adapters"},
+		{"name": "CaptureErrorFailedD3D11CreateDevice", "description": "Failed to create D3D11 device"},
+		{"name": "CaptureErrorFailedEnumOutputs", "description": "Failed to enumerate outputs"},
+		{"name": "CaptureErrorFailedOutputConvert", "description": "Failed to convert output"},
+		{"name": "CaptureErrorFailedDuplicateOutput", "description": "Failed to duplicate output"},
+		{"name": "CaptureErrorFailedAcquireNextFrame", "description": "Failed to acquire next frame"},
+		{"name": "CaptureErrorFailedResourceConvert", "description": "Failed to convert resource"},
+		{"name": "CaptureErrorFailedCreateTexture2D", "description": "Failed to create texture"},
+		{"name": "CaptureErrorFailedCreateOutputView", "description": "Failed to create output view"},
+		{"name": "CaptureErrorFailedCreateInputView", "description": "Failed to create input view"},
+		{"name": "CaptureErrorFailedVideoProcessorBlt", "description": "Failed to execute video processor BLT"},
+		{"name": "CaptureErrorFailedD3D11Map", "description": "Failed to map D3D11 texture"},
+		{"name": "CaptureErrorFailedEncoderInitialization", "description": "Failed to initialize encoder"},
+		{"name": "CaptureErrorFailedHandleCPURawFrame", "description": "Failed to handle CPU raw frame"},
+		{"name": "CaptureErrorFailedCapturedSlotLock", "description": "Failed to lock captured slot"},
+		{"name": "CaptureErrorFailedX264EncoderOpen", "description": "Failed to open x264 encoder"},
+		{"name": "CaptureErrorFailedX264Encode", "description": "Failed to encode frame with x264"},
+		{"name": "CaptureErrorFailedEncoderBufferEmplace", "description": "Failed to emplace frame to encoder buffer"},
+		{"name": "CaptureErrorInvalidDXGIFactory", "description": "Invalid DXGI factory"},
+		{"name": "CaptureErrorInvalidDuplicate", "description": "Invalid duplication"},
+		{"name": "CaptureErrorInvalidX264Preset", "description": "Invalid x264 preset"},
+		{"name": "CaptureErrorInvalidX264Profile", "description": "Invalid x264 profile"},
+		{"name": "CaptureErrorInvalidCapturedTexture", "description": "Invalid captured texture"},
+		{"name": "CaptureErrorInvalidTextureMap", "description": "Invalid texture map"},
+		{"name": "CaptureErrorEmptyCapturedBuffer", "description": "Empty captured buffer"},
+		{"name": "CaptureErrorAccessLost", "description": "Access lost (desktop changed)"}
+	]
+}

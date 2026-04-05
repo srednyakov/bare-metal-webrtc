@@ -11,7 +11,10 @@
 2. **Install CLANG64 toolchain and dependencies:**
    ```powershell
    C:\msys64\msys2_shell.cmd -defterm -here -no-start -clang64 -c "pacman -Syu --noconfirm"
-   C:\msys64\msys2_shell.cmd -defterm -here -no-start -clang64 -c "pacman -S --noconfirm mingw-w64-clang-x86_64-toolchain mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja"
+   C:\msys64\msys2_shell.cmd -defterm -here -no-start -clang64 -c "pacman -S --noconfirm make mingw-w64-clang-x86_64-toolchain mingw-w64-clang-x86_64-cmake mingw-w64-clang-x86_64-ninja"
+
+   # OPTIONAL: install Golang in CLANG64 environment (or use Go from Windows)
+   C:\msys64\msys2_shell.cmd -defterm -here -no-start -clang64 -c "pacman -S mingw-w64-clang-x86_64-go"
    ```
 
 3. **Install vcpkg via `git submodule update --init --recursive`**
@@ -31,9 +34,10 @@ cmake --preset clang64-debug
 cmake --build build/ -j
 ```
 
-### PowerShell (requires installation of CMake & Ninja on Windows)
+### PowerShell
 ```powershell
 $env:PATH = "C:\msys64\clang64\bin;$env:PATH"
+$env:PATH = "C:\msys64\usr\bin;$env:PATH" # for make
 cd win-capture-native
 
 # Release build

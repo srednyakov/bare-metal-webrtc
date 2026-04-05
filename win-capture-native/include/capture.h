@@ -1,12 +1,7 @@
 #pragma once
 
+#include "errors.h"
 #include "types.h"
-
-#ifdef CAPTURE_NATIVE_BUILD
-    #define CAPTURE_API __declspec(dllexport)
-#else
-    #define CAPTURE_API __declspec(dllimport)
-#endif
 
 #ifdef __cplusplus
 extern "C" {

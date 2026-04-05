@@ -26,17 +26,17 @@ auto Capturer::InitializeDuplication() noexcept -> CaptureError {
     ReleaseDuplication();
 
     if (_factory == nullptr) {
-        return CaptureError::CAPTURE_ERROR_INVALID_DXGI_FACTORY;
+        return CaptureError::CaptureErrorFailedCreateDXGIFactory;
     }
 
     if (_duplication != nullptr) {
-        return CaptureError::CAPTURE_ERROR_OK;
+        return CaptureError::CaptureErrorOK;
     }
 
     auto adapter = Microsoft::WRL::ComPtr<IDXGIAdapter1>{};
 
     if (FAILED(_factory->EnumAdapters1(0, &adapter))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_ENUM_ADAPTERS;
+        return CaptureError::CaptureErrorFailedEnumAdapters;
     }
 
     auto flags = UINT{D3D11_CREATE_DEVICE_BGRA_SUPPORT};
@@ -50,22 +50,22 @@ auto Capturer::InitializeDuplication() noexcept -> CaptureError {
         nullptr, 0, D3D11_SDK_VERSION, &_device, &feature_level, &_context);
 
     if (FAILED(result)) {
-        return CaptureError::CAPTURE_ERROR_FAILED_D3D11_CREATE_DEVICE;
+        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
     }
 
     // Query video context and device for GPU color conversion
     if (FAILED(_context->QueryInterface(IID_PPV_ARGS(&_video_context1)))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_D3D11_CREATE_DEVICE;
+        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
     }
 
     if (FAILED(_device->QueryInterface(IID_PPV_ARGS(&_video_device)))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_D3D11_CREATE_DEVICE;
+        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
     }
 
     auto output = Microsoft::WRL::ComPtr<IDXGIOutput>{};
 
     if (FAILED(adapter->EnumOutputs(0, &output))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_ENUM_OUTPUTS;
+        return CaptureError::CaptureErrorFailedEnumOutputs;
     }
 
     // auto outputDescription = DXGI_OUTPUT_DESC{};
@@ -75,11 +75,11 @@ auto Capturer::InitializeDuplication() noexcept -> CaptureError {
     auto output1 = Microsoft::WRL::ComPtr<IDXGIOutput1>{};
 
     if (FAILED(output.As(&output1))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_OUTPUT_CONVERT;
+        return CaptureError::CaptureErrorFailedOutputConvert;
     }
 
     if (FAILED(output1->DuplicateOutput(_device, &_duplication))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_DUPLICATE_OUTPUT;
+        return CaptureError::CaptureErrorFailedDuplicateOutput;
     }
 
     return InitializeVideoProcessor();
@@ -87,11 +87,11 @@ auto Capturer::InitializeDuplication() noexcept -> CaptureError {
 
 auto Capturer::InitializeVideoProcessor() noexcept -> CaptureError {
     if (_video_processor != nullptr) {
-        return CaptureError::CAPTURE_ERROR_OK; // already initialized
+        return CaptureError::CaptureErrorOK; // already initialized
     }
 
     if (_video_device == nullptr || _video_context1 == nullptr) {
-        return CaptureError::CAPTURE_ERROR_INVALID_DXGI_FACTORY;
+        return CaptureError::CaptureErrorFailedCreateDXGIFactory;
     }
 
     const auto description = D3D11_VIDEO_PROCESSOR_CONTENT_DESC{
@@ -104,14 +104,14 @@ auto Capturer::InitializeVideoProcessor() noexcept -> CaptureError {
     };
 
     if (FAILED(_video_device->CreateVideoProcessorEnumerator(&description, &_video_enumerator))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_D3D11_CREATE_DEVICE;
+        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
     }
 
     if (FAILED(_video_device->CreateVideoProcessor(_video_enumerator, 0, &_video_processor))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_D3D11_CREATE_DEVICE;
+        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
     }
 
-    return CaptureError::CAPTURE_ERROR_OK;
+    return CaptureError::CaptureErrorOK;
 }
 
 auto Capturer::ReleaseDuplication() noexcept -> void {
@@ -131,7 +131,7 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
 
     auto slot = _captured.TryLockOldestSlot(MAX_LOCK_RETRY_COUNT);
     if (slot == nullptr) {
-        return CaptureError::CAPTURE_ERROR_FAILED_CAPTURED_SLOT_LOCK;
+        return CaptureError::CaptureErrorFailedCapturedSlotLock;
     }
 
     auto exit_guard = utils::make_scope_exit([slot]() {
@@ -161,7 +161,7 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
         };
 
         if (FAILED(_device->CreateTexture2D(&new_description, nullptr, &slot->texture))) {
-            return CaptureError::CAPTURE_ERROR_FAILED_CREATE_TEXTURE2D;
+            return CaptureError::CaptureErrorFailedCreateTexture2D;
         }
 
         slot->texture_description = new_description;
@@ -174,7 +174,7 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
 
     auto output_view = Microsoft::WRL::ComPtr<ID3D11VideoProcessorOutputView>{};
     if (FAILED(_video_device->CreateVideoProcessorOutputView(slot->texture, _video_enumerator, &output_view_desc, &output_view))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_CREATE_OUTPUT_VIEW;
+        return CaptureError::CaptureErrorFailedCreateOutputView;
     }
 
     const auto input_view_desc = D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC{
@@ -185,7 +185,7 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
 
     auto input_view = Microsoft::WRL::ComPtr<ID3D11VideoProcessorInputView>{};
     if (FAILED(_video_device->CreateVideoProcessorInputView(texture.Get(), _video_enumerator, &input_view_desc, &input_view))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_CREATE_INPUT_VIEW;
+        return CaptureError::CaptureErrorFailedCreateInputView;
     }
 
     _video_context1->VideoProcessorSetStreamColorSpace1(_video_processor, 0, SelectColorSpace(source_description.Format));
@@ -197,12 +197,12 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
     };
 
     if (FAILED(_video_context1->VideoProcessorBlt(_video_processor, output_view.Get(), 0, 1, &stream))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_VIDEO_PROCESSOR_BLT;
+        return CaptureError::CaptureErrorFailedVideoProcessorBlt;
     }
 
     if (!_encoder->IsUsingStaging()) {
         slot->SetIndex(frame_index);
-        return CaptureError::CAPTURE_ERROR_OK;
+        return CaptureError::CaptureErrorOK;
     }
 
     if (slot->staging == nullptr || slot->staging_description != slot->texture_description) {
@@ -216,7 +216,7 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
         new_description.MiscFlags = 0;
 
         if (FAILED(_device->CreateTexture2D(&new_description, nullptr, &slot->staging))) {
-            return CaptureError::CAPTURE_ERROR_FAILED_CREATE_TEXTURE2D;
+            return CaptureError::CaptureErrorFailedCreateTexture2D;
         }
 
         slot->staging_description = new_description;
@@ -225,16 +225,16 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
     _context->CopyResource(slot->staging, slot->texture);
 
     if (FAILED(_context->Map(slot->staging, 0, D3D11_MAP_READ, 0, &slot->staging_map))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_D3D11_MAP;
+        return CaptureError::CaptureErrorFailedD3D11Map;
     }
 
     slot->SetIndex(frame_index);
-    return CaptureError::CAPTURE_ERROR_OK;
+    return CaptureError::CaptureErrorOK;
 }
 
 auto Capturer::CaptureTexture(uint64_t frame_index) noexcept -> CaptureError {
     if (_duplication == nullptr) {
-        return CaptureError::CAPTURE_ERROR_INVALID_DUPLICATE;
+        return CaptureError::CaptureErrorInvalidDuplicate;
     }
 
     auto frame_info = DXGI_OUTDUPL_FRAME_INFO{};
@@ -245,11 +245,11 @@ auto Capturer::CaptureTexture(uint64_t frame_index) noexcept -> CaptureError {
         const auto result = _duplication->AcquireNextFrame(INFINITE, &frame_info, &resource);
 
         if (result == DXGI_ERROR_WAIT_TIMEOUT) {
-            return CaptureError::CAPTURE_ERROR_OK; // no new frame
+            return CaptureError::CaptureErrorOK; // no new frame
         } else if (result == DXGI_ERROR_ACCESS_LOST) {
-            return CaptureError::CAPTURE_ERROR_ACCESS_LOST; // need to reinitialize duplication
+            return CaptureError::CaptureErrorAccessLost; // need to reinitialize duplication
         } else if (FAILED(result)) {
-            return CaptureError::CAPTURE_ERROR_FAILED_ACQUIRE_NEXT_FRAME;
+            return CaptureError::CaptureErrorFailedAcquireNextFrame;
         }
     }
 
@@ -260,7 +260,7 @@ auto Capturer::CaptureTexture(uint64_t frame_index) noexcept -> CaptureError {
     auto texture = Microsoft::WRL::ComPtr<ID3D11Texture2D>{};
 
     if (FAILED(resource.As(&texture))) {
-        return CaptureError::CAPTURE_ERROR_FAILED_RESOURCE_CONVERT;
+        return CaptureError::CaptureErrorFailedResourceConvert;
     }
 
     return HandleCapturedTexture(texture, frame_index);
@@ -278,12 +278,12 @@ auto Capturer::Worker() noexcept -> void {
 
         FrameMarkNamed("DXGI_Capture");
 
-        if (error == CaptureError::CAPTURE_ERROR_OK) {
+        if (error == CaptureError::CaptureErrorOK) {
             captured_index += 1;
             continue;
         }
 
-        if (error != CaptureError::CAPTURE_ERROR_ACCESS_LOST || !_encoder->IsRunning()) {
+        if (error != CaptureError::CaptureErrorAccessLost || !_encoder->IsRunning()) {
             continue;
         }
         
@@ -294,22 +294,22 @@ auto Capturer::Worker() noexcept -> void {
 
 auto Capturer::Start() noexcept -> CaptureError {
     auto error = InitializeDuplication();
-    if (error != CaptureError::CAPTURE_ERROR_OK) {
+    if (error != CaptureError::CaptureErrorOK) {
         return error;
     }
 
     error = InitializeVideoProcessor();
-    if (error != CaptureError::CAPTURE_ERROR_OK) {
+    if (error != CaptureError::CaptureErrorOK) {
         return error;
     }
 
     error = _encoder->Start();
-    if (error != CaptureError::CAPTURE_ERROR_OK) {
-        return CaptureError::CAPTURE_ERROR_FAILED_ENCODER_INITIALIZATION;
+    if (error != CaptureError::CaptureErrorOK) {
+        return CaptureError::CaptureErrorFailedEncoderInitialization;
     }
 
     _worker = std::thread(&Capturer::Worker, this);
-    return CaptureError::CAPTURE_ERROR_OK;
+    return CaptureError::CaptureErrorOK;
 }
 
 auto Capturer::Stop() noexcept -> void {

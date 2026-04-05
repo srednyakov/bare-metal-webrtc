@@ -36,7 +36,7 @@ class Capturer {
     IDXGIFactory1* _factory;
     IEncoder* _encoder;
 
-    std::atomic<CaptureError> _last_error{CaptureError::CAPTURE_ERROR_OK};
+    std::atomic<CaptureError> _last_error{CaptureError::CaptureErrorOK};
     std::thread _worker{};
 
 private:

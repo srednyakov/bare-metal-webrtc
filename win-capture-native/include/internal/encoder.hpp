@@ -45,7 +45,7 @@ protected:
     CapturedBuffer& _captured;
     EncodedBuffer _encoded{64};
 
-    std::atomic<CaptureError> _last_error{CaptureError::CAPTURE_ERROR_OK};
+    std::atomic<CaptureError> _last_error{CaptureError::CaptureErrorOK};
     std::atomic_bool _running{false};
     std::thread _worker{};
 

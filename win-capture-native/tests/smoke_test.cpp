@@ -28,13 +28,13 @@ auto main() -> int {
     auto capturer = static_cast<void*>(nullptr);
 
     auto error = capture_native_create_capturer_x264("smoke_config.yaml", &capturer);
-    if (error != CaptureError::CAPTURE_ERROR_OK) {
+    if (error != CaptureError::CaptureErrorOK) {
         std::println("failed capture_native_create_capturer_x264: {}", error);
         return 1;
     }
 
     error = capture_native_start_capturer(capturer);
-    if (error != CaptureError::CAPTURE_ERROR_OK) {
+    if (error != CaptureError::CaptureErrorOK) {
         std::println("failed capture_native_start_capturer: {}", error);
         return 1;
     }
@@ -63,7 +63,7 @@ auto main() -> int {
         if (frame.data == nullptr) {
             const auto capturer_error = capture_native_get_last_capturer_error(capturer);
             const auto encoder_error = capture_native_get_last_encoder_error(capturer);
-            if (capturer_error != CaptureError::CAPTURE_ERROR_OK || encoder_error != CaptureError::CAPTURE_ERROR_OK) {
+            if (capturer_error != CaptureError::CaptureErrorOK || encoder_error != CaptureError::CaptureErrorOK) {
                 std::println("capturer_error: {} | encoder_error: {}", capturer_error, encoder_error);
             }
             continue;
