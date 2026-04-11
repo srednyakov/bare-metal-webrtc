@@ -13,6 +13,8 @@ High-performance screen capture library for Windows using DXGI Desktop Duplicati
 - **Extensible encoder design** - `IEncoder` interface allows adding new encoders (NVENC, AMF, QSV)
 - **GPU color conversion** - Hardware-accelerated conversion (BGRA/RGB10/RGB16 → NV12) via D3D11 Video Processor with HDR10/scRGB support
 - **Tracy profiling** - Built-in performance profiling via [Tracy 13.1](https://github.com/wolfpld/tracy/releases/tag/v0.13.1) (optional, zero overhead when disabled)
+- **Handles duplication lost** - Automatically recovers from `DXGI_ERROR_ACCESS_LOST` (resolution change, HDR toggle, GPU driver restart, monitor disconnect)
+- **Software adapter detection** - Rejects Microsoft WARP and other non-hardware adapters that don't support Video Processor
 
 ## Architecture
 
@@ -109,7 +111,7 @@ Encoder Implementations:
 | Thread | Responsibility | Frequency |
 |--------|---------------|-----------|
 | **DXGI Thread** | `AcquireNextFrame`, Video Processor (BGRA→NV12), `CopyResource` (optional), `Map` (optional) | ~950ms / FPS (slightly faster than target FPS) |
-| **Encoding Thread** | `x264_encode`, SPSC push | 1000ms / FPS (exact target FPS) |
+| **Encoding Thread** | `x264_encode`, SPSC push | 975ms / FPS (near to exact target FPS) |
 
 The capture thread runs ~5% faster than the encoding thread to ensure fresh frames are always available, preventing encoder starvation.
 
@@ -123,14 +125,15 @@ win-capture-native/
 │
 ├── include/                    # Public headers
 │   ├── capture.h               # C-style API (FFI-friendly)
-│   ├── types.h                 # Public types (EncodedFrame, CaptureError)
+│   ├── errors.h                # Shared errors generated from errors.json (CaptureError)
+│   ├── types.h                 # Public types (EncodedFrame)
 │   └── internal/               # Internal C++ headers
 │       ├── capturer.hpp        # Main Capturer class (DXGI thread, Video Processor)
 │       ├── capturer_fabric.hpp # Singleton factory
 │       ├── encoder.hpp         # IEncoder interface
 │       ├── config.hpp          # YAML config structure
 │       ├── config-nodes/
-│       │   ├── general.hpp     # General settings (width, height, fps)
+│       │   ├── output.hpp     # General settings (width, height, fps)
 │       │   └── x264.hpp        # x264 settings (preset, CRF, threads)
 │       ├── encoders/
 │       │   ├── encoder_x264.hpp  # x264 software encoder (NV12 input)
@@ -144,6 +147,7 @@ win-capture-native/
 │
 ├── src/                        # Implementation
 │   ├── capture.cpp             # C API wrappers
+│   ├── errors.cpp              # Hashmap with errors description
 │   └── internal/
 │       ├── capturer.cpp        # Capturer implementation (GPU color conversion)
 │       ├── capturer_fabric.cpp # Fabric singleton
@@ -152,7 +156,6 @@ win-capture-native/
 │       │   └── encoder_nvenc.cpp   # [FUTURE] NVENC hardware encoding
 │       └── buffers/
 │           └── captured_buffer.cpp # Ring buffer lock/unlock logic
-│
 │
 ├── tests/                      # Smoke tests with Tracy profiling
 │   ├── smoke_test.cpp          # E2E test (30 seconds capture)

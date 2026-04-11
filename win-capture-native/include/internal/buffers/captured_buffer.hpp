@@ -9,6 +9,12 @@
 
 #include "types.h"
 
+#define RELEASE_POINTER(ptr)\
+if (ptr != nullptr) {\
+    ptr->Release();\
+    ptr = nullptr;\
+}
+
 namespace cn {
 class CapturedSlot {
     std::atomic_bool _locked{false};

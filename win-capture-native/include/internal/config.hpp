@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config-nodes/general.hpp"
+#include "config-nodes/output.hpp"
 #include "config-nodes/x264.hpp"
 
 #ifndef YAML_CPP_STATIC_DEFINE
@@ -12,7 +12,7 @@
 namespace cn {
 struct Config {
     /// @brief General settings
-    config::General general;
+    config::Output output;
 
     /// @brief X264 specific settings
     config::X264 x264;
@@ -23,7 +23,7 @@ namespace YAML {
 template<>
 struct convert<cn::Config> {
     static auto decode(const Node& node, cn::Config& rhs) -> bool {
-        rhs.general = node["general"].as<cn::config::General>(rhs.general);
+        rhs.output = node["output"].as<cn::config::Output>(rhs.output);
         rhs.x264 = node["x264"].as<cn::config::X264>(rhs.x264);
         return true;
     }

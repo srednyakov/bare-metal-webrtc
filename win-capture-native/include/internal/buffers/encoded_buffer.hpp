@@ -9,6 +9,8 @@ struct EncodedFrameInternal {
     bool keyframe{};
 
 public:
+    EncodedFrameInternal() = default;
+    
     template<class Type>
     EncodedFrameInternal(Type&& data_, uint64_t pts_, bool keyframe_) 
         : buffer(std::forward<Type>(data_)), 

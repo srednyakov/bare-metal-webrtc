@@ -62,7 +62,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	var ef ErrorsFile
+	ef := ErrorsFile{}
 	if err := json.Unmarshal(data, &ef); err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to parse JSON: %v\n", err)
 		os.Exit(1)

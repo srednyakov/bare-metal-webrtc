@@ -9,8 +9,8 @@
 #include <yaml-cpp/yaml.h>
 
 namespace cn::config {
-/// @brief General settings
-struct General {
+/// @brief General output settings
+struct Output {
     /// @brief Encoding width
     uint32_t width = 1920;
 
@@ -24,8 +24,8 @@ struct General {
 
 namespace YAML {
 template<>
-struct convert<cn::config::General> {
-    static auto decode(Node const& node, cn::config::General& rhs) -> bool {
+struct convert<cn::config::Output> {
+    static auto decode(Node const& node, cn::config::Output& rhs) -> bool {
         rhs.width = node["width"].as<uint32_t>(rhs.width);
         rhs.height = node["height"].as<uint32_t>(rhs.height);
         rhs.fps = node["fps"].as<uint32_t>(rhs.fps);

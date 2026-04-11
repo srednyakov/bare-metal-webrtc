@@ -20,6 +20,8 @@ namespace cn {
 class Capturer {
     static constexpr auto MAX_LOCK_RETRY_COUNT = 3ul;
 
+    IDXGIFactory1* _factory{nullptr};
+    IDXGIAdapter1* _adapter{nullptr};
     ID3D11Device* _device{nullptr};
     ID3D11DeviceContext* _context{nullptr};
     IDXGIOutputDuplication* _duplication{nullptr};
@@ -30,21 +32,29 @@ class Capturer {
     ID3D11VideoProcessor* _video_processor{nullptr};
     ID3D11VideoProcessorEnumerator* _video_enumerator{nullptr};
 
+    D3D11_VIDEO_PROCESSOR_CONTENT_DESC _video_processor_description{};
+
     CapturedBuffer _captured{};
     Config _config;
 
-    IDXGIFactory1* _factory;
     IEncoder* _encoder;
 
     std::atomic<CaptureError> _last_error{CaptureError::CaptureErrorOK};
     std::thread _worker{};
 
+    long _source_width{0};
+    long _source_height{0};
+
 private:
     auto SelectColorSpace(DXGI_FORMAT format) const noexcept -> DXGI_COLOR_SPACE_TYPE;
 
+    auto Initialize() noexcept -> CaptureError;
     auto InitializeDuplication() noexcept -> CaptureError;
-    auto InitializeVideoProcessor() noexcept -> CaptureError;
-    auto ReleaseDuplication() noexcept -> void;
+    auto InitializeVideoDeviceAndContext() noexcept -> CaptureError;
+
+    auto InitializeVideoProcessor(uint32_t source_width, uint32_t source_height) noexcept -> CaptureError;
+
+    auto Release() noexcept -> void;
 
     auto HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> const& texture, 
         size_t frame_index) noexcept -> CaptureError;
@@ -52,11 +62,13 @@ private:
     auto CaptureTexture(uint64_t frame_index) noexcept -> CaptureError;
     auto Worker() noexcept -> void;
 
+    auto OnLostDuplication() noexcept -> void;
+    auto SetLastError(CaptureError error) noexcept -> void;
+
 public:
     template<class EncoderType, class ConfigType>
-    Capturer(IDXGIFactory1* factory, ConfigType&& config, std::type_identity<EncoderType>) noexcept
-        : _factory(factory),
-          _config(std::forward<ConfigType>(config)),
+    Capturer(ConfigType&& config, std::type_identity<EncoderType>) noexcept
+        : _config(std::forward<ConfigType>(config)),
           _encoder(new EncoderType(_device, _context, _duplication, _captured, _config)) {}
 
     ~Capturer() noexcept;
@@ -73,7 +85,7 @@ public:
 };
 
 template<class EncoderType, class ConfigType>
-static auto make_capturer(IDXGIFactory1* factory, ConfigType&& config) -> Capturer* {
-    return new Capturer(factory, std::forward<ConfigType>(config), std::type_identity<EncoderType>{});
+static auto make_capturer(ConfigType&& config) -> Capturer* {
+    return new Capturer(std::forward<ConfigType>(config), std::type_identity<EncoderType>{});
 }
 }

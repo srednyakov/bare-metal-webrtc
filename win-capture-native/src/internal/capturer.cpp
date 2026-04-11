@@ -7,10 +7,16 @@
 
 using namespace std::chrono_literals;
 
+namespace {
+inline auto get_output_value(auto config_value, auto source_value) {
+    return config_value == 0 ? source_value : config_value;
+}
+}
+
 namespace cn {
 Capturer::~Capturer() noexcept {
     Stop();
-    ReleaseDuplication();
+    Release();
     delete _encoder;
 }
 
@@ -23,54 +29,23 @@ auto Capturer::SelectColorSpace(DXGI_FORMAT format) const noexcept -> DXGI_COLOR
 }
 
 auto Capturer::InitializeDuplication() noexcept -> CaptureError {
-    ReleaseDuplication();
+    RELEASE_POINTER(_duplication);
 
-    if (_factory == nullptr) {
-        return CaptureError::CaptureErrorFailedCreateDXGIFactory;
-    }
-
-    if (_duplication != nullptr) {
-        return CaptureError::CaptureErrorOK;
-    }
-
-    auto adapter = Microsoft::WRL::ComPtr<IDXGIAdapter1>{};
-
-    if (FAILED(_factory->EnumAdapters1(0, &adapter))) {
-        return CaptureError::CaptureErrorFailedEnumAdapters;
-    }
-
-    auto flags = UINT{D3D11_CREATE_DEVICE_BGRA_SUPPORT};
-#ifdef _DEBUG
-    flags |= D3D11_CREATE_DEVICE_DEBUG;
-#endif
-
-    auto feature_level = D3D_FEATURE_LEVEL{};
-
-    const auto result = D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, flags,
-        nullptr, 0, D3D11_SDK_VERSION, &_device, &feature_level, &_context);
-
-    if (FAILED(result)) {
-        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
-    }
-
-    // Query video context and device for GPU color conversion
-    if (FAILED(_context->QueryInterface(IID_PPV_ARGS(&_video_context1)))) {
-        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
-    }
-
-    if (FAILED(_device->QueryInterface(IID_PPV_ARGS(&_video_device)))) {
-        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
+    if (_video_device == nullptr || _video_context1 == nullptr) {
+        return CaptureError::CaptureErrorInvalidD3D11VideoDeviceOrContext; // software adapter issue. TODO: auto fallback to libyuv color convert
     }
 
     auto output = Microsoft::WRL::ComPtr<IDXGIOutput>{};
 
-    if (FAILED(adapter->EnumOutputs(0, &output))) {
+    if (FAILED(_adapter->EnumOutputs(0, &output))) {
         return CaptureError::CaptureErrorFailedEnumOutputs;
     }
 
-    // auto outputDescription = DXGI_OUTPUT_DESC{};
-    // output->GetDesc(&outputDescription);
-    // std::printf("Using output: %ls\n", outputDescription.DeviceName);
+    auto output_description = DXGI_OUTPUT_DESC{};
+    output->GetDesc(&output_description);
+
+    _source_width = output_description.DesktopCoordinates.right - output_description.DesktopCoordinates.left;
+    _source_height = output_description.DesktopCoordinates.bottom - output_description.DesktopCoordinates.top;
 
     auto output1 = Microsoft::WRL::ComPtr<IDXGIOutput1>{};
 
@@ -82,46 +57,114 @@ auto Capturer::InitializeDuplication() noexcept -> CaptureError {
         return CaptureError::CaptureErrorFailedDuplicateOutput;
     }
 
-    return InitializeVideoProcessor();
+    return CaptureError::CaptureErrorOK;
 }
 
-auto Capturer::InitializeVideoProcessor() noexcept -> CaptureError {
-    if (_video_processor != nullptr) {
-        return CaptureError::CaptureErrorOK; // already initialized
+auto Capturer::InitializeVideoDeviceAndContext() noexcept -> CaptureError {
+    RELEASE_POINTER(_video_context1);
+    RELEASE_POINTER(_video_device);
+
+    // query video context and device for GPU color conversion
+    if (FAILED(_context->QueryInterface(IID_PPV_ARGS(&_video_context1)))) {
+        return CaptureError::CaptureErrorFailedCreateD3D11VideoDeviceOrContext; // software adapter issue. TODO: auto fallback to libyuv color convert
     }
 
-    if (_video_device == nullptr || _video_context1 == nullptr) {
-        return CaptureError::CaptureErrorFailedCreateDXGIFactory;
-    }
-
-    const auto description = D3D11_VIDEO_PROCESSOR_CONTENT_DESC{
-        .InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
-        .InputWidth = _config.general.width,
-        .InputHeight = _config.general.height,
-        .OutputWidth = _config.general.width,
-        .OutputHeight = _config.general.height,
-        .Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
-    };
-
-    if (FAILED(_video_device->CreateVideoProcessorEnumerator(&description, &_video_enumerator))) {
-        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
-    }
-
-    if (FAILED(_video_device->CreateVideoProcessor(_video_enumerator, 0, &_video_processor))) {
-        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
+    if (FAILED(_device->QueryInterface(IID_PPV_ARGS(&_video_device)))) {
+        return CaptureError::CaptureErrorFailedCreateD3D11VideoDeviceOrContext; // software adapter issue. TODO: auto fallback to libyuv color convert
     }
 
     return CaptureError::CaptureErrorOK;
 }
 
-auto Capturer::ReleaseDuplication() noexcept -> void {
+auto Capturer::Initialize() noexcept -> CaptureError {
+    ZoneScopedNC(__FUNCTION__, tracy::Color::Beige);
+
+    Release();
+
+    if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&_factory)))) {
+        return CaptureError::CaptureErrorFailedCreateDXGIFactory;
+    }
+
+    if (FAILED(_factory->EnumAdapters1(0, &_adapter))) {
+        return CaptureError::CaptureErrorFailedEnumAdapters;
+    }
+
+    auto flags = UINT{D3D11_CREATE_DEVICE_BGRA_SUPPORT};
+#ifdef _DEBUG
+    flags |= D3D11_CREATE_DEVICE_DEBUG;
+#endif
+
+    auto feature_level = D3D_FEATURE_LEVEL{};
+
+    const auto result = D3D11CreateDevice(_adapter, D3D_DRIVER_TYPE_UNKNOWN, nullptr, flags,
+        nullptr, 0, D3D11_SDK_VERSION, &_device, &feature_level, &_context);
+
+    if (FAILED(result)) {
+        return CaptureError::CaptureErrorFailedD3D11CreateDevice;
+    }
+
+    const auto error = InitializeVideoDeviceAndContext();
+    if (error != CaptureError::CaptureErrorOK) {
+        return error;
+    }
+
+    return InitializeDuplication();
+}
+
+auto Capturer::InitializeVideoProcessor(uint32_t source_width, uint32_t source_height) noexcept -> CaptureError {
+    RELEASE_POINTER(_video_processor);
+    RELEASE_POINTER(_video_enumerator);
+
+    if (_video_device == nullptr || _video_context1 == nullptr) {
+        return CaptureError::CaptureErrorInvalidD3D11VideoDeviceOrContext; // software adapter issue. TODO: auto fallback to libyuv color convert
+    }
+
+    auto new_description = D3D11_VIDEO_PROCESSOR_CONTENT_DESC{
+        .InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE,
+        .InputWidth = source_width,
+        .InputHeight = source_height,
+        .OutputWidth = get_output_value(_config.output.width, source_width),
+        .OutputHeight = get_output_value(_config.output.height, source_height),
+        .Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL,
+    };
+
+    if (FAILED(_video_device->CreateVideoProcessorEnumerator(&new_description, &_video_enumerator))) {
+        return CaptureError::CaptureErrorFailedCreateVideoProcessorEnumerator;
+    }
+
+    if (FAILED(_video_device->CreateVideoProcessor(_video_enumerator, 0, &_video_processor))) {
+        return CaptureError::CaptureErrorFailedCreateVideoProcessor;
+    }
+
+    _video_processor_description = new_description;
+    return CaptureError::CaptureErrorOK;
+}
+
+auto Capturer::Release() noexcept -> void {
+    for (auto i = size_t{0}; i < _captured.GetSize(); ++i) {
+        auto slot = _captured.GetSlotByIndexWithoutLock(i);
+
+        if (slot->staging != nullptr && slot->staging_map.pData != nullptr) {
+            _context->Unmap(slot->staging, 0);
+        }      
+
+        RELEASE_POINTER(slot->texture);
+        RELEASE_POINTER(slot->staging);
+
+        slot = {};
+    }
+
     RELEASE_POINTER(_video_processor);
     RELEASE_POINTER(_video_enumerator);
     RELEASE_POINTER(_video_context1);
     RELEASE_POINTER(_video_device);
-    RELEASE_POINTER(_device);
-    RELEASE_POINTER(_context);
     RELEASE_POINTER(_duplication);
+    RELEASE_POINTER(_context);
+    RELEASE_POINTER(_device);
+    RELEASE_POINTER(_adapter);
+    RELEASE_POINTER(_factory);
+
+    _video_processor_description = {};
 }
 
 auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> const& texture, 
@@ -146,12 +189,26 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
     auto source_description = D3D11_TEXTURE2D_DESC{};
     texture->GetDesc(&source_description);
 
-    if (slot->texture == nullptr || slot->texture_description != source_description) {
-        RELEASE_POINTER(slot->texture);
+    // EncoderX264 will update the parameters itself
+    const auto size_mismatch = source_description.Width != _video_processor_description.InputWidth || 
+        source_description.Height != _video_processor_description.InputHeight;
+
+    if (_video_processor == nullptr || _video_enumerator == nullptr || size_mismatch) {
+        const auto error = InitializeVideoProcessor(source_description.Width, source_description.Height);
+        if (error != CaptureError::CaptureErrorOK) {
+            return error;
+        }
+    }
+
+    const auto width = get_output_value(_config.output.width, source_description.Width);
+    const auto height = get_output_value(_config.output.height, source_description.Height);
+
+    if (slot->texture == nullptr || slot->texture_description.Width != width || slot->texture_description.Height != height) {
+        RELEASE_POINTER(slot->texture)
 
         auto new_description = D3D11_TEXTURE2D_DESC{
-            .Width      = source_description.Width,
-            .Height     = source_description.Height,
+            .Width      = width,
+            .Height     = height,
             .MipLevels  = 1,
             .ArraySize  = 1,
             .Format     = DXGI_FORMAT_NV12,
@@ -234,22 +291,20 @@ auto Capturer::HandleCapturedTexture(Microsoft::WRL::ComPtr<ID3D11Texture2D> con
 
 auto Capturer::CaptureTexture(uint64_t frame_index) noexcept -> CaptureError {
     if (_duplication == nullptr) {
-        return CaptureError::CaptureErrorInvalidDuplicate;
+        return CaptureError::CaptureErrorInvalidDuplication;
     }
 
     auto frame_info = DXGI_OUTDUPL_FRAME_INFO{};
     auto resource = Microsoft::WRL::ComPtr<IDXGIResource>{};
-
+    
     {
         ZoneScopedNC("CaptureTexture.AcquireNextFrame", tracy::Color::Azure);
         const auto result = _duplication->AcquireNextFrame(INFINITE, &frame_info, &resource);
 
         if (result == DXGI_ERROR_WAIT_TIMEOUT) {
             return CaptureError::CaptureErrorOK; // no new frame
-        } else if (result == DXGI_ERROR_ACCESS_LOST) {
-            return CaptureError::CaptureErrorAccessLost; // need to reinitialize duplication
-        } else if (FAILED(result)) {
-            return CaptureError::CaptureErrorFailedAcquireNextFrame;
+        }  else if (FAILED(result)) {
+            return CaptureError::CaptureErrorDuplicationLost;
         }
     }
 
@@ -267,14 +322,14 @@ auto Capturer::CaptureTexture(uint64_t frame_index) noexcept -> CaptureError {
 }
 
 auto Capturer::Worker() noexcept -> void {
-    auto timer = utils::Timer(950ms, _config.general.fps, 0); // capturer`s ticker a little faster than encoder
+    auto timer = utils::Timer(950ms, _config.output.fps, 0); // capturer`s ticker a little faster than encoder
     auto captured_index = uint64_t{0};
 
     while (_encoder->IsRunning()) {
         timer.Wait();
 
         const auto error = CaptureTexture(captured_index);
-        _last_error.store(error, std::memory_order_relaxed);
+        SetLastError(error);
 
         FrameMarkNamed("DXGI_Capture");
 
@@ -283,29 +338,64 @@ auto Capturer::Worker() noexcept -> void {
             continue;
         }
 
-        if (error != CaptureError::CaptureErrorAccessLost || !_encoder->IsRunning()) {
+        if (error == CaptureError::CaptureErrorDuplicationLost || error == CaptureError::CaptureErrorInvalidDuplication) {
+            OnLostDuplication();
             continue;
         }
-        
-        // reinit duplication
-        InitializeDuplication();
     }
 }
 
+auto Capturer::OnLostDuplication() noexcept -> void {
+    while (true) {
+        // if the screen size has changed, we can try a light restart of duplication
+        auto error = InitializeDuplication();
+        if (error == CaptureError::CaptureErrorOK) {
+            _encoder->SetUseCached(false);
+            return;
+        }
+
+        const auto required_full_reset = _device == nullptr || // Initialize() resets the device, but it cannot always immediately create a new one
+            _device->GetDeviceRemovedReason() != S_OK || // GPU driver crash/restart 
+            error == CaptureErrorInvalidD3D11VideoDeviceOrContext; // software adapter issue, reset till real driver init. TODO: auto fallback to libyuv color convert
+
+        if (required_full_reset) {
+            _encoder->SetUseCached(true);
+            while (!_encoder->IsCachedReady()) {
+                std::this_thread::sleep_for(3ms);
+            }
+
+            error = Initialize(); // full capturer reset
+            if (error == CaptureError::CaptureErrorOK) {
+                _encoder->SetUseCached(false);
+                return;
+            }
+
+            SetLastError(error);
+            std::this_thread::sleep_for(100ms); // + longer sleep for full reset
+            continue;
+        }
+
+        SetLastError(error);
+        std::this_thread::sleep_for(10ms); // little sleep for duplication reset
+    }
+}
+
+auto Capturer::SetLastError(CaptureError error) noexcept -> void {
+    _last_error.store(error, std::memory_order_relaxed);
+}
+
 auto Capturer::Start() noexcept -> CaptureError {
-    auto error = InitializeDuplication();
+    auto error = Initialize();
     if (error != CaptureError::CaptureErrorOK) {
         return error;
     }
 
-    error = InitializeVideoProcessor();
+    const auto width = get_output_value(_config.output.width, _source_width);
+    const auto height = get_output_value(_config.output.height, _source_height);
+
+    error = _encoder->Start(width, height);
     if (error != CaptureError::CaptureErrorOK) {
         return error;
-    }
-
-    error = _encoder->Start();
-    if (error != CaptureError::CaptureErrorOK) {
-        return CaptureError::CaptureErrorFailedEncoderInitialization;
     }
 
     _worker = std::thread(&Capturer::Worker, this);
@@ -314,16 +404,6 @@ auto Capturer::Start() noexcept -> CaptureError {
 
 auto Capturer::Stop() noexcept -> void {
     _encoder->Stop();
-
-    for (auto i = size_t{0}; i < _captured.GetSize(); ++i) {
-        auto slot = _captured.GetSlotByIndexWithoutLock(i);
-        RELEASE_POINTER(slot->texture);
-        slot = {};
-    }
-
-    if (_worker.joinable()) {
-        _worker.join();
-    }
 }
 
 auto Capturer::GetEncoded() noexcept -> EncodedBuffer& {

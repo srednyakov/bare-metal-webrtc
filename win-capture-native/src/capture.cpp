@@ -5,7 +5,9 @@
 #define CAPTURER_POINTER(ptr) (reinterpret_cast<cn::Capturer*>(ptr))
 
 CAPTURE_API int capture_native_create_capturer_x264(const char* config_path, void** out_capturer_handle) {
-    auto [capturer, create_error] = cn::CapturerFabric::Instance().CreateCapturer<cn::EncoderX264>(config_path);
+    auto [capturer, create_error] = 
+        cn::CapturerFabric::Instance().CreateCapturer<cn::EncoderX264>(config_path != nullptr ? config_path : "");
+        
     if (create_error != CaptureError::CaptureErrorOK) {
         return static_cast<int>(create_error);
     }

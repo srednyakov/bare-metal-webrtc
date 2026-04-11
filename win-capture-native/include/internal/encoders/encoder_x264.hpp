@@ -24,10 +24,18 @@ class EncoderX264 : public IEncoder {
     x264_picture_t _x264_pic_in{};
     x264_picture_t _x264_pic_out{};
 
+    // using while capturer restarts
+    RawCpuFrame _cached_frame;
+    std::vector<uint8_t> _cached_buffer{};
+
 private:
-    auto InitializeX264() -> CaptureError;
+    auto InitializeX264(int width, int height) noexcept -> CaptureError;
 
     auto HandleRawCpuFrame(RawCpuFrame const& frame) noexcept -> CaptureError;
+
+    auto CopyToCached(CapturedSlot const* captured, uint64_t frame_pts) noexcept -> void;
+    auto HandleCachedMode(uint64_t frame_pts) -> CaptureError;
+
     auto Worker() noexcept -> void;
 
 public:
@@ -37,7 +45,7 @@ public:
 
     ~EncoderX264();
 
-    auto Start() noexcept -> CaptureError override;
+    auto Start(int width, int height) noexcept -> CaptureError override;
     auto Stop() noexcept -> void override;
 
     auto IsUsingStaging() const noexcept -> bool override;

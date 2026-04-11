@@ -8,23 +8,14 @@
 
 namespace cn {
 class CapturerFabric {
-    IDXGIFactory1* _factory{nullptr};
-
-private:
     CapturerFabric() = default;
 
 public:
     CapturerFabric(CapturerFabric const&) = delete;
     CapturerFabric(CapturerFabric&&) = delete;
 
-    ~CapturerFabric();
-
     template<class EncoderType>
     auto CreateCapturer(std::string const& config_path) -> std::pair<Capturer*, CaptureError> {
-        if (_factory == nullptr && FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&_factory)))) {
-            return {nullptr, CaptureError::CaptureErrorInvalidDXGIFactory};
-        }
-
         auto config = Config{};
 
         if (!config_path.empty()) {
@@ -36,7 +27,7 @@ public:
             }
         }
 
-        return {make_capturer<EncoderType>(_factory, std::move(config)), CaptureError::CaptureErrorOK};
+        return {make_capturer<EncoderType>(std::move(config)), CaptureError::CaptureErrorOK};
     }
 
     auto DeleteCapturer(Capturer* capturer) -> void;

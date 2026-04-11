@@ -15,8 +15,11 @@ EncoderX264::~EncoderX264() {
     Stop();
 }
 
-auto EncoderX264::InitializeX264() -> CaptureError {
-    Stop(); // clear before config
+auto EncoderX264::InitializeX264(int width, int height) noexcept -> CaptureError {
+    if (_x264_encoder != nullptr) {
+        x264_encoder_close(_x264_encoder);
+        _x264_encoder = nullptr;
+    }
 
     if (x264_param_default_preset(&_x264_param, _config.x264.preset.c_str(), "zerolatency") != 0) {
         return CaptureError::CaptureErrorInvalidX264Preset;
@@ -28,10 +31,10 @@ auto EncoderX264::InitializeX264() -> CaptureError {
     _x264_param.i_log_level = X264_LOG_NONE;
 #endif // _DEBUG
 
-    _x264_param.i_width  = _config.general.width;
-    _x264_param.i_height = _config.general.height;
+    _x264_param.i_width  = width;
+    _x264_param.i_height = height;
 
-    _x264_param.i_fps_num = _config.general.fps;
+    _x264_param.i_fps_num = _config.output.fps;
     _x264_param.i_fps_den = 1;
 
     _x264_param.i_threads = _config.x264.threads;
@@ -43,7 +46,7 @@ auto EncoderX264::InitializeX264() -> CaptureError {
     _x264_param.rc.i_rc_method = X264_RC_CRF; // constant quality
     _x264_param.rc.f_rf_constant = _config.x264.rf_constant; // 0-51 (< == better)
 
-    _x264_param.i_keyint_max = _config.general.fps; // keyframe every second
+    _x264_param.i_keyint_max = _config.output.fps; // keyframe every second
     _x264_param.i_scenecut_threshold = 0;
 
     _x264_param.i_bframe = 0; // for lower latency
@@ -68,8 +71,8 @@ auto EncoderX264::InitializeX264() -> CaptureError {
     return CaptureError::CaptureErrorOK;
 }
 
-auto EncoderX264::Start() noexcept -> CaptureError {
-    auto error = InitializeX264();
+auto EncoderX264::Start(int width, int height) noexcept -> CaptureError {
+    auto error = InitializeX264(width, height);
     if (error != CaptureError::CaptureErrorOK) {
         return error;
     }
@@ -89,11 +92,19 @@ auto EncoderX264::Stop() noexcept -> void {
 
     if (_x264_encoder != nullptr) {
         x264_encoder_close(_x264_encoder);
+        _x264_encoder = nullptr;
     }
 }
 
 auto EncoderX264::HandleRawCpuFrame(RawCpuFrame const& frame) noexcept -> CaptureError {
-    // Setup NV12 planes (pointer arithmetic only, no copy)
+    // reinit encoder after input resolution change
+    if (_x264_param.i_width != frame.width || _x264_param.i_height != frame.height) {
+        const auto error = InitializeX264(frame.width, frame.height);
+        if (error != CaptureError::CaptureErrorOK) {
+            return error;
+        }
+    }
+
     _x264_pic_in.img.plane[0] = const_cast<uint8_t*>(frame.data);
     _x264_pic_in.img.plane[1] = const_cast<uint8_t*>(frame.data) + static_cast<size_t>(frame.pitch) * frame.height;
     _x264_pic_in.img.plane[2] = nullptr;
@@ -135,20 +146,68 @@ auto EncoderX264::HandleRawCpuFrame(RawCpuFrame const& frame) noexcept -> Captur
         offset += nal_size;
     }
 
-    const auto result = _encoded.try_emplace(std::move(buffer), frame.pts, _x264_pic_out.i_type == X264_TYPE_IDR);
+    const auto is_keyframe = _x264_pic_out.i_type == X264_TYPE_IDR;
+
+    const auto result = _encoded.try_emplace(std::move(buffer), frame.pts, is_keyframe);
     return result ? CaptureError::CaptureErrorOK : CaptureError::CaptureErrorFailedEncoderBufferEmplace;
 }
 
+auto EncoderX264::CopyToCached(CapturedSlot const* captured, uint64_t frame_pts) noexcept -> void {
+    const auto total_size = captured->staging_map.RowPitch * (captured->staging_description.Height * 3 / 2);
+
+    _cached_buffer.resize(total_size);
+    std::memcpy(_cached_buffer.data(), captured->staging_map.pData, total_size);
+
+    _cached_frame = RawCpuFrame{
+        .data   = static_cast<uint8_t const*>(_cached_buffer.data()),
+        .pitch  = static_cast<int>(captured->staging_map.RowPitch),
+        .width  = static_cast<int>(captured->staging_description.Width),
+        .height = static_cast<int>(captured->staging_description.Height),
+        .pts    = frame_pts,
+    };
+}
+
+auto EncoderX264::HandleCachedMode(uint64_t frame_pts) -> CaptureError {
+    if (IsCachedReady()) {
+        if (_cached_frame.pts == 0) {
+            return CaptureError::CaptureErrorNoCachedFrame;
+        }
+        _cached_frame.pts = frame_pts;
+        return HandleRawCpuFrame(_cached_frame);
+    }
+
+    // all slots must be free while GetUseCached() == true
+    auto slot = _captured.TryLockLatestSlot(MAX_LOCK_RETRY_COUNT);
+    if (slot == nullptr) {
+        _cached_frame.pts = 0;
+        // failed to get cached frame, store true to prevent infinite capturer lock
+        _cached_ready.store(true, std::memory_order_relaxed);
+        return CaptureError::CaptureErrorNoCachedFrame;
+    }
+
+    CopyToCached(slot, frame_pts);
+    _cached_ready.store(true, std::memory_order_relaxed);
+    
+    return HandleRawCpuFrame(_cached_frame);
+}
+
 auto EncoderX264::Worker() noexcept -> void {
-    auto timer = utils::Timer(1s, _config.general.fps, 0);
+    auto timer = utils::Timer(975ms, _config.output.fps, 0);
     auto frame_pts = uint64_t{0};
 
-    while (_running.load(std::memory_order_relaxed)) {
+    while (IsRunning()) {
         timer.Wait();
+
+        if (GetUseCached()) {
+            const auto error = HandleCachedMode(frame_pts);
+            frame_pts += (error == CaptureError::CaptureErrorOK);
+            SetLastError(error);
+            continue;
+        }
 
         auto slot = _captured.TryLockLatestSlot(MAX_LOCK_RETRY_COUNT);
         if (slot == nullptr) {
-            _last_error.store(CaptureError::CaptureErrorEmptyCapturedBuffer, std::memory_order_relaxed);
+            SetLastError(CaptureError::CaptureErrorEmptyCapturedBuffer);
             continue;
         }
 
@@ -157,12 +216,12 @@ auto EncoderX264::Worker() noexcept -> void {
         });
 
         if (slot->staging == nullptr) {
-            _last_error.store(CaptureError::CaptureErrorInvalidCapturedTexture, std::memory_order_relaxed);
+            SetLastError(CaptureError::CaptureErrorInvalidCapturedTexture);
             continue;
         }
 
         if (slot->staging_map.pData == nullptr) {
-            _last_error.store(CaptureError::CaptureErrorInvalidTextureMap, std::memory_order_relaxed);
+            SetLastError(CaptureError::CaptureErrorInvalidTextureMap);
             continue;
         }
 
@@ -175,13 +234,9 @@ auto EncoderX264::Worker() noexcept -> void {
         };
 
         const auto error = HandleRawCpuFrame(raw_frame);
-        _last_error.store(error, std::memory_order_relaxed);
+        SetLastError(error);
 
-        if (error != CaptureError::CaptureErrorOK) {
-            continue;
-        }
-
-        frame_pts += 1;
+        frame_pts += (error == CaptureError::CaptureErrorOK);
         FrameMarkNamed("Encoding_X264");
     }
 }

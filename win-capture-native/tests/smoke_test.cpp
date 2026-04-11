@@ -29,13 +29,13 @@ auto main() -> int {
 
     auto error = capture_native_create_capturer_x264("smoke_config.yaml", &capturer);
     if (error != CaptureError::CaptureErrorOK) {
-        std::println("failed capture_native_create_capturer_x264: {}", error);
+        std::println("failed capture_native_create_capturer_x264: {} ({})", error, capture_native_get_error_description(error));
         return 1;
     }
 
     error = capture_native_start_capturer(capturer);
     if (error != CaptureError::CaptureErrorOK) {
-        std::println("failed capture_native_start_capturer: {}", error);
+        std::println("failed capture_native_start_capturer: {} ({})", error, capture_native_get_error_description(error));
         return 1;
     }
 
@@ -45,9 +45,9 @@ auto main() -> int {
         file = std::fopen("smoke_output.h264", "wb");
     }
 
-    auto timer = cn::utils::Timer(1s, config.general.fps);
+    auto timer = cn::utils::Timer(1s, config.output.fps);
 
-    const auto expected_pts = (EXPECTED_SECONDS * config.general.fps);
+    const auto expected_pts = (EXPECTED_SECONDS * config.output.fps);
     auto pts = uint64_t{0};
 
     while (pts != expected_pts) {
@@ -64,7 +64,8 @@ auto main() -> int {
             const auto capturer_error = capture_native_get_last_capturer_error(capturer);
             const auto encoder_error = capture_native_get_last_encoder_error(capturer);
             if (capturer_error != CaptureError::CaptureErrorOK || encoder_error != CaptureError::CaptureErrorOK) {
-                std::println("capturer_error: {} | encoder_error: {}", capturer_error, encoder_error);
+                std::println("capturer_error: {} ({}) | encoder_error: {} ({})", capture_native_get_error_description(capturer_error), 
+                    capturer_error, capture_native_get_error_description(encoder_error), encoder_error);
             }
             continue;
         }

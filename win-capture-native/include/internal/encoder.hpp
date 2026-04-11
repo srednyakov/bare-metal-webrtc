@@ -13,12 +13,6 @@
 
 #include "config.hpp"
 
-#define RELEASE_POINTER(ptr)\
-if (ptr != nullptr) {\
-    ptr->Release();\
-    ptr = nullptr;\
-}
-
 namespace cn {
 inline auto operator==(D3D11_TEXTURE2D_DESC const& a, D3D11_TEXTURE2D_DESC const& b) -> bool {
     return (a.Width == b.Width) && (a.Height == b.Height);
@@ -49,6 +43,14 @@ protected:
     std::atomic_bool _running{false};
     std::thread _worker{};
 
+    std::atomic_bool _use_cached{false};
+    std::atomic_bool _cached_ready{false};
+
+protected:
+    auto SetLastError(CaptureError error) noexcept -> void {
+        _last_error.store(error, std::memory_order_relaxed);
+    }
+
 public:
     IEncoder(ID3D11Device*& device, ID3D11DeviceContext*& context, IDXGIOutputDuplication*& duplication, CapturedBuffer& captured, Config& config) noexcept
         : _device(device),
@@ -59,20 +61,35 @@ public:
           
     virtual ~IEncoder() noexcept = default;
 
-    virtual auto Start() noexcept -> CaptureError = 0;
+    virtual auto Start(int width, int height) noexcept -> CaptureError = 0;
     virtual auto Stop() noexcept -> void = 0;
 
     virtual auto IsUsingStaging() const noexcept -> bool = 0;
 
-    auto GetEncoded() -> EncodedBuffer& {
+    auto SetUseCached(bool state) noexcept -> void {
+        if (GetUseCached() != state) {
+            _cached_ready.store(false, std::memory_order_relaxed);
+        }
+        _use_cached.store(state, std::memory_order_relaxed);
+    }
+
+    auto GetUseCached() const noexcept -> bool {
+        return _use_cached.load(std::memory_order_relaxed);
+    }
+
+    auto IsCachedReady() const noexcept -> bool {
+        return _cached_ready.load(std::memory_order_relaxed);
+    }
+    
+    auto GetEncoded() noexcept -> EncodedBuffer& {
         return _encoded;
     }
 
-    auto IsRunning() -> bool {
+    auto IsRunning() const noexcept -> bool {
         return _running.load(std::memory_order_relaxed);
     }
 
-    auto GetLastWorkerError() const -> CaptureError {
+    auto GetLastWorkerError() const noexcept -> CaptureError {
         return _last_error.load(std::memory_order_relaxed);
     }
 };
