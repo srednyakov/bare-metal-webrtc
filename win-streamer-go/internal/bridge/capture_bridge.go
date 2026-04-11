@@ -1,11 +1,10 @@
 //go:build windows
 // +build windows
 
-package internal
+package bridge
 
 /*
-#cgo CFLAGS: -I${SRCDIR}/../../win-capture-native/include
-#cgo LDFLAGS: -L${SRCDIR}/../../win-capture-native/build/bin/Release -lwin-capture-native
+#cgo CFLAGS: -I${SRCDIR}/../../../win-capture-native/include
 #include <Windows.h>
 #include "capture.h"
 */
@@ -66,7 +65,7 @@ func (c *Capturer) Close() {
 }
 
 // PopFrame retrieves the front encoded frame and removes it from the queue
-func (c *Capturer) GetFrame() (*EncodedFrame, error) {
+func (c *Capturer) PopFrame() (*EncodedFrame, error) {
 	frame := C.capture_native_get_frame(c.handle)
 	if frame.data == nil {
 		return nil, errors.New("no frame available")

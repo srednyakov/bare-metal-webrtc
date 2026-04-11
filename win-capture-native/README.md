@@ -14,7 +14,7 @@ High-performance screen capture library for Windows using DXGI Desktop Duplicati
 - **GPU color conversion** - Hardware-accelerated conversion (BGRA/RGB10/RGB16 → NV12) via D3D11 Video Processor with HDR10/scRGB support
 - **Tracy profiling** - Built-in performance profiling via [Tracy 13.1](https://github.com/wolfpld/tracy/releases/tag/v0.13.1) (optional, zero overhead when disabled)
 - **Handles duplication lost** - Automatically recovers from `DXGI_ERROR_ACCESS_LOST` (resolution change, HDR toggle, GPU driver restart, monitor disconnect)
-- **Software adapter detection** - Rejects Microsoft WARP and other non-hardware adapters that don't support Video Processor
+- **Software adapter detection** - Rejects Microsoft WARP and other non-hardware adapters that don't support Video Processor (TODO: fallback to libyuv color convert)
 
 ## Architecture
 
@@ -256,16 +256,18 @@ win-capture-native/
 ## Configuration (YAML)
 
 ```yaml
-general:
-  width: 3440
-  height: 1440
+# General output settings
+output:
+  width: 0  # 0 = system width
+  height: 0 # 0 = system height
   fps: 60
 
+# CPU-encoder specific settings
 x264:
-  preset: veryfast    # ultrafast, superfast, veryfast, faster, fast
-  profile: high       # baseline, main, high
-  rf_constant: 18.0   # 0-51 (lower = better quality, higher = smaller size)
-  threads: 0          # 0 = auto, -1 = sync lookahead
+  preset: veryfast  # ultrafast, superfast, veryfast, faster, fast
+  profile: high     # baseline, main, high
+  rf_constant: 18.0 # 0-51 (< == better)
+  threads: 0        # 0 = auto, -1 = sync lookahead (it`s better to limit the number of threads to reduce the load on the CPU)
 ```
 
 ## Performance X264 (Tracy profile)

@@ -1,0 +1,12 @@
+# General output settings
+output:
+  width: 0  # 0 = system width
+  height: 0 # 0 = system height
+  fps: 60
+
+# CPU-encoder specific settings
+x264:
+  preset: veryfast  # ultrafast, superfast, veryfast, faster, fast
+  profile: high     # baseline, main, high
+  rf_constant: 18.0 # 0-51 (< == better)
+  threads: 0        # 0 = auto, -1 = sync lookahead (it`s better to limit the number of threads to reduce the load on the CPU)
