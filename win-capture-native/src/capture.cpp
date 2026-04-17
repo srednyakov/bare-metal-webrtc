@@ -33,6 +33,11 @@ CAPTURE_API struct EncodedFrame capture_native_get_frame(void* capturer_handle) 
     decltype(auto) encoded = CAPTURER_POINTER(capturer_handle)->GetEncoded();
 
     auto result = EncodedFrame{};
+
+    if (encoded.size() == 0) {
+        return result;
+    }
+
     auto slot = encoded.front();
 
     if (slot != nullptr) {

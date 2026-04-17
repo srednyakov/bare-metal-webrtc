@@ -15,9 +15,9 @@ inline auto get_output_value(auto config_value, auto source_value) {
 
 namespace cn {
 Capturer::~Capturer() noexcept {
-    Stop();
-    Release();
-    delete _encoder;
+    Stop(); // stop Encoder/Capturer workers
+    Release(); // release D3D11 data
+    delete _encoder; // release encoder
 }
 
 auto Capturer::SelectColorSpace(DXGI_FORMAT format) const noexcept -> DXGI_COLOR_SPACE_TYPE {
@@ -143,15 +143,7 @@ auto Capturer::InitializeVideoProcessor(uint32_t source_width, uint32_t source_h
 auto Capturer::Release() noexcept -> void {
     for (auto i = size_t{0}; i < _captured.GetSize(); ++i) {
         auto slot = _captured.GetSlotByIndexWithoutLock(i);
-
-        if (slot->staging != nullptr && slot->staging_map.pData != nullptr) {
-            _context->Unmap(slot->staging, 0);
-        }      
-
-        RELEASE_POINTER(slot->texture);
-        RELEASE_POINTER(slot->staging);
-
-        slot = {};
+        slot->Release(_context);
     }
 
     RELEASE_POINTER(_video_processor);
@@ -346,7 +338,7 @@ auto Capturer::Worker() noexcept -> void {
 }
 
 auto Capturer::OnLostDuplication() noexcept -> void {
-    while (true) {
+    while (_encoder->IsRunning()) {
         // if the screen size has changed, we can try a light restart of duplication
         auto error = InitializeDuplication();
         if (error == CaptureError::CaptureErrorOK) {
@@ -356,7 +348,7 @@ auto Capturer::OnLostDuplication() noexcept -> void {
 
         const auto required_full_reset = _device == nullptr || // Initialize() resets the device, but it cannot always immediately create a new one
             _device->GetDeviceRemovedReason() != S_OK || // GPU driver crash/restart 
-            error == CaptureErrorInvalidD3D11VideoDeviceOrContext; // software adapter issue, reset till real driver init. TODO: auto fallback to libyuv color convert
+            error == CaptureError::CaptureErrorInvalidD3D11VideoDeviceOrContext; // software adapter issue, reset till real driver init. TODO: auto fallback to libyuv color convert
 
         if (required_full_reset) {
             _encoder->SetUseCached(true);

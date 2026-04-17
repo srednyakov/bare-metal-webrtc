@@ -19,7 +19,7 @@ struct X264 {
     std::string profile = "high";
 
     /// @brief Constant Rate Factor (0-51; < == better)
-    float rf_constant = 18.f;
+    float rf_constant = 0.f;
 
     /// @brief Encoding threads count (X264_THREADS_AUTO == 0, X264_SYNC_LOOKAHEAD_AUTO == -1)
     int threads = 0;
@@ -32,7 +32,7 @@ struct convert<cn::config::X264> {
     static auto decode(Node const& node, cn::config::X264& rhs) -> bool {
         rhs.preset = node["preset"].as<std::string>(rhs.preset);
         rhs.profile = node["profile"].as<std::string>(rhs.profile);
-        rhs.rf_constant = node["profile"].as<float>(rhs.rf_constant);
+        rhs.rf_constant = node["rf_constant"].as<float>(rhs.rf_constant);
         rhs.threads = node["threads"].as<uint32_t>(rhs.threads);
         return true;
     }

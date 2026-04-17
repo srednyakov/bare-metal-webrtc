@@ -7,6 +7,7 @@
 #include "capturer.hpp"
 
 namespace cn {
+/// Centralizes config loading and future multi-capturer coordination.
 class CapturerFabric {
     CapturerFabric() = default;
 

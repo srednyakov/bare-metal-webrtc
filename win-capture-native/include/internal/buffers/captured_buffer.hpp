@@ -30,13 +30,15 @@ public:
     D3D11_TEXTURE2D_DESC staging_description{};
     D3D11_MAPPED_SUBRESOURCE staging_map{};
 
-    auto GetIndex() const -> uint64_t;
-    auto SetIndex(uint64_t index) -> void;
+    auto GetIndex() const noexcept -> uint64_t;
+    auto SetIndex(uint64_t index) noexcept -> void;
 
-    auto IsLocked() const -> bool;
+    auto IsLocked() const noexcept -> bool;
 
-    auto TryLock(uint64_t expected_index) -> bool;
-    auto Unlock() -> void;
+    auto TryLock(uint64_t expected_index) noexcept -> bool;
+    auto Unlock() noexcept -> void;
+
+    auto Release(ID3D11DeviceContext* context) noexcept -> void;
 };
 
 class CapturedBuffer {
