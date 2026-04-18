@@ -10,6 +10,7 @@
           "CMAKE_BUILD_TYPE": "Release",
           "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/third-party/vcpkg/scripts/buildsystems/vcpkg.cmake",
           "VCPKG_TARGET_TRIPLET": "x64-mingw-static",
+          "VCPKG_HOST_TRIPLET": "x64-mingw-static",
           "VCPKG_CHAINLOAD_TOOLCHAIN_FILE": "${sourceDir}/cmake/clang.cmake"
         }
       },
