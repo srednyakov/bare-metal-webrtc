@@ -1,4 +1,4 @@
-.PHONY: all gen build build-debug clean
+.PHONY: all gen build build-debug test clean
 
 BIN_DIR := bin
 BIN_DIR_RELEASE := ${BIN_DIR}/Release
@@ -39,6 +39,9 @@ $(BIN_DIR_RELEASE):
 
 $(BIN_DIR_DEBUG):
 	mkdir -p $(BIN_DIR_DEBUG)
+
+test:
+	cd $(STREAMER_DIR) && go test ./...
 
 clean:
 	cmake -E rm -rf $(NATIVE_CAPTURE_BUILD_DIR)
