@@ -1,12 +1,27 @@
-# General output settings
+# Unified config for win-streamer-go.
+# C++ capture library reads output/x264 and ignores server/turn sections.
+
+# Capture output settings
 output:
-  width: 0  # 0 = system width
-  height: 0 # 0 = system height
+  width: 0   # 0 = native screen width
+  height: 0  # 0 = native screen height
   fps: 60
 
-# CPU-encoder specific settings
+# x264 encoder settings
 x264:
   preset: veryfast  # ultrafast, superfast, veryfast, faster, fast
   profile: high     # baseline, main, high
-  rf_constant: 18.0 # 0-51 (< == better)
-  threads: 0        # 0 = auto, -1 = sync lookahead (it`s better to limit the number of threads to reduce the load on the CPU)
+  rf_constant: 18.0 # 0-51 (lower = better quality)
+  threads: 0        # 0 = auto, -1 = sync lookahead
+
+# HTTP/WebSocket server
+server:
+  address: "0.0.0.0:8080"   # bind address
+  secret: "victoria"        # viewer auth secret (required)
+
+# Embedded TURN/STUN server (pion/turn).
+# If external_ip is empty, TURN does not start — LAN-only mode.
+# If external_ip is set, TURN starts and the viewer uses it for NAT traversal.
+turn:
+  external_ip: ""       # public IP or "dns:your.hostname.com" — empty = LAN-only
+  turn_address: ":3478" # TURN listener (UDP+TCP)
