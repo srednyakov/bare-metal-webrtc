@@ -23,8 +23,8 @@ build: $(BIN_DIR_RELEASE)
 	cmake --build $(NATIVE_CAPTURE_BUILD_DIR) --config Release
 	cp $(NATIVE_CAPTURE_BUILD_DIR)/bin/Release/libwin-capture-native.dll $(BIN_DIR_RELEASE)/
 
-	cd ${STREAMER_DIR} && go build -o ../${BIN_DIR_RELEASE}/capture-test.exe ./cmd/capture-test
-	cp $(STREAMER_DIR)/configs/config.example.yaml $(BIN_DIR_RELEASE)/capture_test_config.yaml
+	cd ${STREAMER_DIR} && go build -o ../${BIN_DIR_RELEASE}/streamer.exe ./cmd/streamer
+	cp $(STREAMER_DIR)/configs/config.example.yaml $(BIN_DIR_RELEASE)/streamer.yaml
 
 build-debug: $(BIN_DIR_DEBUG)
 	cd $(NATIVE_CAPTURE_DIR) && cmake --preset clang64-debug
@@ -33,6 +33,9 @@ build-debug: $(BIN_DIR_DEBUG)
 
 	cd ${STREAMER_DIR} && go build -tags debug -o ../${BIN_DIR_DEBUG}/capture-test.exe ./cmd/capture-test
 	cp $(STREAMER_DIR)/configs/config.example.yaml $(BIN_DIR_DEBUG)/capture_test_config.yaml
+
+	cd ${STREAMER_DIR} && go build -tags debug -o ../${BIN_DIR_DEBUG}/streamer.exe ./cmd/streamer
+	cp $(STREAMER_DIR)/configs/config.example.yaml $(BIN_DIR_DEBUG)/streamer.yaml
 	
 $(BIN_DIR_RELEASE):
 	mkdir -p $(BIN_DIR_RELEASE)
